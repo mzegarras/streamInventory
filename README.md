@@ -34,8 +34,8 @@ curl -s http://localhost:8081/subjects/t.orders-value/versions/1 | jq "."
 docker exec kafka01 kafka-topics --bootstrap-server kafka01:9092 \
     --create \
     --topic t.orders \
-    --partitions 3 \
-    --replication-factor 1
+    --partitions 1 \
+    --replication-factor 3
 ```
 
 

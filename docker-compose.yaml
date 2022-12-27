@@ -55,20 +55,6 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     depends_on:
       - zookeeper    
-  kafka-setup:
-      image: confluentinc/cp-kafka:7.1.0
-      container_name: kafka-setup
-      restart: "no"
-      entrypoint: >
-        bash -c  "sleep 30 &&
-                  kafka-topics --create --bootstrap-server kafka01:9092 --replication-factor 1 --partitions 3 --topic t.inventory &&
-                  kafka-topics --create --bootstrap-server kafka01:9092 --replication-factor 1 --partitions 3 --topic t.otp"
-                  
-      depends_on:
-        - zookeeper
-        - kafka01
-        - kafka02
-        - kafka03
   ksqldb-server:
       image: confluentinc/ksqldb-server:0.26.0
       hostname: ksqldb-server
@@ -189,16 +175,3 @@ services:
         - kafka01
         - kafka02
         - kafka03       
-  ksqldb-examples:
-      image: confluentinc/ksqldb-examples:latest
-      container_name: ksqldb-examples
-      restart: always
-      depends_on:
-        - kafka01
-        - kafka02
-        - kafka03
-        - ksqldb-server
-      entrypoint: /bin/sh
-      tty: true
-      volumes:
-        - ./data-gen:/tmp/data-gen
