@@ -1,0 +1,56 @@
+{
+  "namespace": "cloud.csonic.types.events",
+  "type": "record",
+  "name": "OrderEvent",
+  "fields": [
+    {
+      "name": "orderId",
+      "type": {
+        "type": "string",
+        "arg.properties": {
+          "iteration": {
+            "start": 1
+          }
+        }
+      }
+    },   
+    {
+      "name": "productId",
+      "type": {
+        "type": "string",
+        "arg.properties": {
+          "options": [
+            "PS5",
+            "IP14",
+            "ALEX"
+          ]
+        }
+      }
+    },
+    {
+      "name": "amount",
+      "type":{
+        "type":"long",
+        "arg.properties":{
+          "range":{
+            "min":1,
+            "max":20
+          }
+        }
+      }
+    },
+    {"name": "created",
+      "type": {
+        "type": "long",
+
+        "format_as_time" : "unix_long",
+        "arg.properties":{
+          "range":{
+            "min":1487715775521,
+            "max":1519273364600
+          }
+        }
+      }
+    }
+  ]
+}

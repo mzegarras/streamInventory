@@ -1,0 +1,204 @@
+---
+version: '3'
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.1.0
+    restart: always
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "22181:2181"
+  kafka01:
+    image: confluentinc/cp-kafka:7.1.0
+    container_name: kafka01
+    restart: always
+    ports:
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka01:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    depends_on:
+      - zookeeper
+  kafka02:
+    image: confluentinc/cp-kafka:7.1.0
+    container_name: kafka02
+    restart: always
+    ports:
+      - "39092:39092"
+    environment:
+      KAFKA_BROKER_ID: 2
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka02:9092,PLAINTEXT_HOST://localhost:39092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    depends_on:
+      - zookeeper
+  kafka03:
+    image: confluentinc/cp-kafka:7.1.0
+    container_name: kafka03
+    restart: always
+    ports:
+      - "49092:49092"
+    environment:
+      KAFKA_BROKER_ID: 3
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka03:9092,PLAINTEXT_HOST://localhost:49092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    depends_on:
+      - zookeeper    
+  kafka-setup:
+      image: confluentinc/cp-kafka:7.1.0
+      container_name: kafka-setup
+      restart: "no"
+      entrypoint: >
+        bash -c  "sleep 30 &&
+                  kafka-topics --create --bootstrap-server kafka01:9092 --replication-factor 1 --partitions 3 --topic t.inventory &&
+                  kafka-topics --create --bootstrap-server kafka01:9092 --replication-factor 1 --partitions 3 --topic t.otp"
+                  
+      depends_on:
+        - zookeeper
+        - kafka01
+        - kafka02
+        - kafka03
+  ksqldb-server:
+      image: confluentinc/ksqldb-server:0.26.0
+      hostname: ksqldb-server
+      container_name: ksqldb-server
+      restart: always
+      depends_on:
+        - kafka01
+        - kafka02
+        - kafka03
+      ports:
+        - "8088:8088"
+      environment:
+        KSQL_LISTENERS: http://0.0.0.0:8088
+        KSQL_BOOTSTRAP_SERVERS: kafka01:9092,kafka02:9092,kafka03:9092
+        KSQL_KSQL_SCHEMA_REGISTRY_URL: "http://schema-registry:8081"
+        KSQL_KSQL_LOGGING_PROCESSING_STREAM_AUTO_CREATE: "true"
+        KSQL_KSQL_LOGGING_PROCESSING_TOPIC_AUTO_CREATE: "true"
+        # # Configuration to embed Kafka Connect support.
+        # KSQL_CONNECT_GROUP_ID: "ksql-connect-cluster"
+        # KSQL_CONNECT_BOOTSTRAP_SERVERS: "broker:9092"
+        # KSQL_CONNECT_KEY_CONVERTER: "org.apache.kafka.connect.storage.StringConverter"
+        # KSQL_CONNECT_VALUE_CONVERTER: "io.confluent.connect.avro.AvroConverter"
+        # KSQL_CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: "http://schema-registry:8081"
+        # KSQL_CONNECT_CONFIG_STORAGE_TOPIC: "_ksql-connect-configs"
+        # KSQL_CONNECT_OFFSET_STORAGE_TOPIC: "_ksql-connect-offsets"
+        # KSQL_CONNECT_STATUS_STORAGE_TOPIC: "_ksql-connect-statuses"
+        # KSQL_CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
+        # KSQL_CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
+        # KSQL_CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
+        # KSQL_CONNECT_PLUGIN_PATH: "/usr/share/kafka/plugins"        
+  ksqldb-cli:
+      image: confluentinc/ksqldb-cli:0.25.1
+      container_name: ksqldb-cli
+      restart: always
+      depends_on:
+        - kafka01
+        - kafka02
+        - kafka03
+        - ksqldb-server
+      entrypoint: /bin/sh
+      tty: true
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.1.0
+    hostname: schema-registry
+    container_name: schema-registry
+    restart: always
+    depends_on:
+        - zookeeper
+        - kafka01
+        - kafka02
+        - kafka03
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: "PLAINTEXT://kafka01:9092,PLAINTEXT://kafka02:9092,PLAINTEXT://kafka03:9092"
+  connect-1:
+      image: confluentinc/cp-kafka-connect:latest
+      container_name: connect-1
+      restart: always
+      ports:
+        - "8083:8083"
+      volumes:
+        - ./connectors:/usr/share/java/jars
+        - ./data-gen:/tmp/data-gen
+      environment:
+        CONNECT_REST_PORT: 8083
+        CONNECT_BOOTSTRAP_SERVERS: "PLAINTEXT://kafka01:9092,PLAINTEXT://kafka02:9092,PLAINTEXT://kafka03:9092"
+        CONNECT_GROUP_ID: "connect"
+        CONNECT_CONFIG_STORAGE_TOPIC: "connect-config"
+        CONNECT_OFFSET_STORAGE_TOPIC: "connect-offsets"
+        CONNECT_STATUS_STORAGE_TOPIC: "connect-status"
+        CONNECT_REPLICATION_FACTOR: 1
+        CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
+        CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
+        CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
+        CONNECT_KEY_CONVERTER: "org.apache.kafka.connect.storage.StringConverter"
+        CONNECT_VALUE_CONVERTER: "io.confluent.connect.avro.AvroConverter"
+        CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: "http://schema-registry:8081"
+        CONNECT_INTERNAL_KEY_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+        CONNECT_INTERNAL_VALUE_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+        CONNECT_PLUGIN_PATH: /usr/share/java
+        CONNECT_REST_ADVERTISED_HOST_NAME: "connect-1"
+      depends_on:
+          - zookeeper
+          - kafka01
+          - kafka02
+          - kafka03      
+  connect-2:
+    image: confluentinc/cp-kafka-connect:latest
+    container_name: connect-2
+    restart: always
+    ports:
+      - "8084:8084"
+    volumes:
+      - ./connectors:/usr/share/java/jars
+      - ./data-gen:/tmp/data-gen
+    environment:
+      CONNECT_REST_PORT: 8084
+      CONNECT_BOOTSTRAP_SERVERS: "PLAINTEXT://kafka01:9092,PLAINTEXT://kafka02:9092,PLAINTEXT://kafka03:9092"
+      CONNECT_GROUP_ID: "connect"
+      CONNECT_CONFIG_STORAGE_TOPIC: "connect-config"
+      CONNECT_OFFSET_STORAGE_TOPIC: "connect-offsets"
+      CONNECT_STATUS_STORAGE_TOPIC: "connect-status"
+      CONNECT_REPLICATION_FACTOR: 1
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_KEY_CONVERTER: "org.apache.kafka.connect.storage.StringConverter"
+      CONNECT_VALUE_CONVERTER: "io.confluent.connect.avro.AvroConverter"
+      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: "http://schema-registry:8081"
+      CONNECT_INTERNAL_KEY_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      CONNECT_INTERNAL_VALUE_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      CONNECT_PLUGIN_PATH: /usr/share/java
+      CONNECT_REST_ADVERTISED_HOST_NAME: "connect-2"
+    depends_on:
+        - zookeeper
+        - kafka01
+        - kafka02
+        - kafka03       
+  ksqldb-examples:
+      image: confluentinc/ksqldb-examples:latest
+      container_name: ksqldb-examples
+      restart: always
+      depends_on:
+        - kafka01
+        - kafka02
+        - kafka03
+        - ksqldb-server
+      entrypoint: /bin/sh
+      tty: true
+      volumes:
+        - ./data-gen:/tmp/data-gen
