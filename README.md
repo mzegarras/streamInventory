@@ -47,11 +47,14 @@ docker exec -it connect-1 \
     --data @/tmp/data-gen/config/orders_datagen.config
 
 docker exec -it connect-1 \
-  curl -X GET http://localhost:8083/connectors/DatagenUsers01
+  curl -X GET http://localhost:8083/connectors/DatagenUsers01/status
 
 docker exec -it connect-1 \
-  curl -X DELETE http://localhost:8083/connectors/DatagenUsers01
-  
+  curl -X PUT http://localhost:8083/connectors/DatagenUsers01/pause
+
+docker exec -it connect-1 \
+  curl -X PUT http://localhost:8083/connectors/DatagenUsers01/resume
+
 ```
 
 ## 6 Connect ksqlDB
